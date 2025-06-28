@@ -179,7 +179,7 @@ class _HomeScreenState extends State<HomeScreen> {
               TextFormField(
                 controller: _transactionDate,
                 onTap: _selectDate,
-                readOnly: true,
+                
                 decoration: InputDecoration(
                   hintText: "Date",
                   labelText: "Select your Date",
