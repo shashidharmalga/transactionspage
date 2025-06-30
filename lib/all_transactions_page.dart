@@ -11,6 +11,11 @@ class AllTransactionsPage extends StatefulWidget {
 class _AllTransactionsPageState extends State<AllTransactionsPage> {
   List<dynamic> transactions = [];
 
+  final TextEditingController _typeController = TextEditingController();
+  final TextEditingController _categoryController = TextEditingController();
+  final TextEditingController _amountController = TextEditingController();
+  final TextEditingController _noteController = TextEditingController();
+
   @override
   void initState() {
     super.initState();
@@ -27,6 +32,120 @@ class _AllTransactionsPageState extends State<AllTransactionsPage> {
     setState(() {
       transactions = response;
     });
+  }
+
+  Future<void> deleteTransaction(String transactionId) async {
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text("Confirm Delete"),
+        content: const Text("Are you sure you want to delete this transaction?"),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text("Cancel"),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text("Delete"),
+          ),
+        ],
+      ),
+    );
+
+    if (confirm == true) {
+      await Supabase.instance.client
+          .from('expenses')
+          .delete()
+          .eq('transaction_id', transactionId);
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("Transaction deleted")),
+      );
+
+      fetchTransactions();
+    }
+  }
+
+  void editTransaction(Map transaction) {
+    _typeController.text = transaction['type'];
+    _categoryController.text = transaction['category'];
+    _amountController.text = transaction['amount'].toString();
+    _noteController.text = transaction['note'] ?? '';
+
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text("Edit Transaction"),
+        content: SingleChildScrollView(
+          child: Column(
+            children: [
+              TextFormField(
+                controller: _typeController,
+                decoration: const InputDecoration(labelText: "Type"),
+              ),
+              const SizedBox(height: 10),
+              TextFormField(
+                controller: _categoryController,
+                decoration: const InputDecoration(labelText: "Category"),
+              ),
+              const SizedBox(height: 10),
+              TextFormField(
+                controller: _amountController,
+                keyboardType: TextInputType.number,
+                decoration: const InputDecoration(labelText: "Amount"),
+              ),
+              const SizedBox(height: 10),
+              TextFormField(
+                controller: _noteController,
+                decoration: const InputDecoration(labelText: "Note"),
+              ),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text("Cancel"),
+          ),
+          ElevatedButton(
+            onPressed: () async {
+              final String type = _typeController.text.trim();
+              final String category = _categoryController.text.trim();
+              final double? amount = double.tryParse(_amountController.text.trim());
+              final String note = _noteController.text.trim();
+
+              if (type.isEmpty || category.isEmpty || amount == null) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text("Please fill all fields")),
+                );
+                return;
+              }
+
+              await Supabase.instance.client
+                  .from('expenses')
+                  .update({
+                    'type': type,
+                    'category': category,
+                    'amount': amount,
+                    'note': note,
+                  })
+                  .eq('transaction_id', transaction['transaction_id']);
+
+              Navigator.pop(context);
+
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text("Transaction updated")),
+              );
+
+              fetchTransactions();
+            },
+            child: const Text("Update"),
+          ),
+        ],
+      ),
+    );
   }
 
   @override
@@ -63,6 +182,19 @@ class _AllTransactionsPageState extends State<AllTransactionsPage> {
                     subtitle: Text(
                       "₹${t['amount']} on ${t['transaction_date']}\nNote: ${t['note'] ?? ''}",
                       style: const TextStyle(color: Color.fromARGB(221, 53, 38, 215)),
+                    ),
+                    trailing: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        IconButton(
+                          icon: const Icon(Icons.edit, color: Colors.deepPurple),
+                          onPressed: () => editTransaction(t),
+                        ),
+                        IconButton(
+                          icon: const Icon(Icons.delete, color: Colors.red),
+                          onPressed: () => deleteTransaction(t['transaction_id']),
+                        ),
+                      ],
                     ),
                   ),
                 );
